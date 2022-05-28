@@ -1,0 +1,11 @@
+Business Process
+
+1.Customers come to the cinema.
+2.Cinema Shows existing Movies.
+3.The customer chooses the film he wants to watch in the cinema.
+4.The customer sees the available seats.
+5.The customer makes a seat reservation.
+6.Customers make payments.
+7.If the customer's money is in excess, the difference will be refunded.
+8.The customer has successfully purchased a ticket.
+9.The customer prints a ticket to enter the cinema.
