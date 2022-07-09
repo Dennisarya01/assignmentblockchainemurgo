@@ -1,195 +1,195 @@
 // SPDX-License-Identifier: UNLICENSED
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.7.0;
 
-import "../Ownable.sol";
 
-contract CinemaaTicketBook is Ownable {
+contract CinemaaTicketBook {
+    address payable public owner;
+
+    uint public countMovie = 0;
+    uint public countBooking = 1;
+    uint totalFund = 0;
+
+    enum MovieTypes {ACTION, COMEDY, DRAMA}
+
     struct Booking {
         uint bookId;
         uint amount;
-        uint totalTicket;
-        bool isPaid;
         uint[] seats;
-        uint studiosId;
-        uint totalBalance;
+        uint movieId;
+        bool isPaid;
+        address payable currentCustomer;    
     }
 
-    struct CinemaStudio {
-        uint studioId;
+    struct Movie {
+        uint movieId;
         string movieTitle;
-        uint priceMovie;
-        bool seat1;
-        bool seat2;
-        bool seat3;
+        uint moviePrice;
+        MovieTypes movieTypes;
+        uint[] seatId;
     }
 
-    struct Order {
-        uint orderId;
-        uint noTicket;
-    }
+    mapping(uint => Movie) Movies;
 
-    mapping(uint => CinemaStudio) public Theater;
-
-    mapping(address => Booking) Book;
-
-    mapping(uint => Order) Orders;
+    mapping(uint => Booking) Bookings;
 
     uint indexOrder = 1;
-    uint indexBook = 1;
 
     constructor() {
-        Theater[0].studioId = 1;
-        Theater[0].movieTitle = "Doctor Strange";
-        Theater[0].priceMovie = 1 ether;
-        Theater[0].seat1 = false;
-        Theater[0].seat2 = false;
-        Theater[0].seat3 = false;
-
-        Theater[1].studioId = 2;
-        Theater[1].movieTitle = "The Amazing Spider-Man";
-        Theater[1].priceMovie = 1 ether;
-        Theater[1].seat1 = false;
-        Theater[1].seat2 = false;
-        Theater[1].seat3 = false;
-
-        Theater[2].studioId = 3;
-        Theater[2].movieTitle = "Shang-Chi and The Legend of The Ten Rings";
-        Theater[2].priceMovie = 1 ether;
-        Theater[2].seat1 = false;
-        Theater[2].seat2 = false;
-        Theater[2].seat3 = false;
-    }
-
-    function bookingSeat(uint _theater, uint _seat) public 
-        checkSeatOne(_theater, _seat) checkSeatTwo(_theater, _seat) checkSeatThree(_theater, _seat) 
-        returns(bool success) {
-    
-        if(_seat == 1) {
-            Theater[_theater].seat1 = true;
-            Book[msg.sender].seats.push(1);
-            Book[msg.sender].totalTicket += 1;
-        } else if (_seat == 2) {
-            Theater[_theater].seat2 = true;
-            Book[msg.sender].seats.push(2);
-            Book[msg.sender].totalTicket += 1;
-        } else {
-            Theater[_theater].seat3 = true;
-            Book[msg.sender].seats.push(3);
-            Book[msg.sender].totalTicket += 1;
-        }
-        
-        Book[msg.sender].bookId = indexBook;
-        Book[msg.sender].amount = Book[msg.sender].totalTicket * Theater[_theater].priceMovie;
-        Book[msg.sender].studiosId = Theater[_theater].studioId;
-        Book[msg.sender].isPaid = false;
-        return true;
-    }
-
-    function paymentBooking() payable external checkBalance() checkBook() 
-        returns(bool success) {
-
-        Book[msg.sender].isPaid = true;
-
-        Orders[Book[msg.sender].bookId].orderId = indexOrder;
-        Orders[Book[msg.sender].bookId].noTicket = block.timestamp;
-        
-        indexOrder++;
-        indexBook++;
-
-        uint balanceToSend = 0;
-        uint refund = 0;
-        
-        if (msg.value > Book[msg.sender].amount) {
-            refund = msg.value - Book[msg.sender].amount;
-            payable(msg.sender).transfer(refund);
-        }
-
-        balanceToSend = msg.value - refund;
-        owner.transfer(balanceToSend);
-        return true;
-    }
-    
-    function getTheater() public view returns (uint[] memory studioId, string[] memory moviesTitle,
-        uint[] memory pricesMovie) {
-      uint[] memory id = new uint[](3);
-      string[] memory title = new string[](3);
-      uint[] memory prices = new uint[](3);
-      for (uint i = 0; i < 3; i++) {
-          CinemaStudio storage cinemas = Theater[i];
-          id[i] = cinemas.studioId;
-          title[i] = cinemas.movieTitle;
-          prices[i] = cinemas.priceMovie;
-      }
-      return (id, title, prices);
-    }
-    
-    function getBooking() public view returns (uint _id, uint _amount, uint[] memory _seat,
-        uint _totalTicket, bool _isPaid) {
-        uint lengths = Book[msg.sender].seats.length;
-        
-        uint id = Book[msg.sender].bookId;
-        uint amount = Book[msg.sender].amount;
-        uint totalTicket = Book[msg.sender].totalTicket;
-        bool isPaid = Book[msg.sender].isPaid;
-
-        uint[] memory seat = new uint[](lengths);
-
-        Booking storage books = Book[msg.sender];
-        for (uint i = 0; i < lengths; i++) {
-            seat[i] = books.seats[i];
-        }
-
-        return (id, amount, seat, totalTicket, isPaid);
-    }
-
-    function printTicket(uint _bookId) public view returns(uint _id, uint _noTicket,
-        uint[] memory _seat, bool _isPaid) {
-        uint lengths = Book[msg.sender].seats.length;
-        uint id = Orders[_bookId].orderId;
-        uint noTicket = Orders[_bookId].noTicket;
-        bool isPaid = Book[msg.sender].isPaid;
-        uint[] memory seat = new uint[](lengths);
-
-        Booking storage books = Book[msg.sender];
-        for (uint i = 0; i < lengths; i++) {
-            seat[i] = books.seats[i];
-        }
-
-        return (id, noTicket, seat, isPaid);
+        owner = msg.sender;
     }
 
     modifier isOwner {
-        require(owner == msg.sender, "fungsi ini hanya boleh diakses owner");
+        require (owner == msg.sender, "You are not owner");
         _;
     }
 
-    modifier checkBook() {
-        uint ids = Book[msg.sender].bookId;
+    modifier isNotOwner {
+        require (owner != msg.sender, "You are not customer");
+        _;
+    }
+
+    modifier isMovieAvailable(uint _movieId) {
+        require(Movies[_movieId].movieId != 0, "The Movie is not Available");
+        _;
+    }
+
+    modifier ChooseSeats(uint _seatId) {
+        require(_seatId <= 5, "Select Seat Between seat 1 to seat 5.");
+        _;
+    }
+
+    modifier checkBook(uint _bookId) {
+        uint ids = Bookings[_bookId].bookId;
         require(ids != 0, "You haven't booked");
         _;
     }
 
-    modifier checkBalance() {
-        uint _cost = Book[msg.sender].amount;
+    modifier checkBalance(uint _bookId) {
+        uint _cost = Bookings[_bookId].amount;
         require(msg.value >= _cost, "not enough funds");
         _;
     }
 
-    modifier checkSeatOne(uint _theater, uint _seat1) {
-        bool seats1 = _seat1 == 1 && Theater[_theater].seat1;
-        require(seats1 == false, "seat 1 not available");
-        _;
-    }
-    modifier checkSeatTwo(uint _theater, uint _seat2) {
-        bool seats2 = _seat2 == 2 && Theater[_theater].seat2;
-        require(seats2 == false, "seat 2 not available");
+    modifier checkPaid(uint _bookingId) {
+        require(!Bookings[_bookingId].isPaid, "You already paid");
         _;
     }
 
-    modifier checkSeatThree(uint _theater, uint _seat3) {
-        bool seats3 = _seat3 == 3 && Theater[_theater].seat3;
-        require(seats3 == false, "seat 3 not available");
+    modifier isSeatAvailableMovie(uint _movieId, uint _seatId) {
+
+        bool availableSeat = false;
+        for (uint i = 0; i < Movies[_movieId].seatId.length; i++) {
+            if (_seatId == Movies[_movieId].seatId[i]) {
+                availableSeat = true;
+            }
+        }
+        require(!availableSeat, "Seat are filled");
         _;
+    }
+
+    modifier isSeatAvailable(uint _seatId) {
+        if (Bookings[countBooking].currentCustomer != msg.sender) {
+            delete Bookings[countBooking].seats;
+        }
+
+        bool availableSeat = false;
+        for (uint i = 0; i < Bookings[countBooking].seats.length; i++) {
+            if (_seatId == Bookings[countBooking].seats[i]) {
+                availableSeat = true;
+            }
+        }
+        require(!availableSeat, "Seat are booked");
+        _;
+    }
+
+    function addMovie(string memory _movieTitle, uint _moviePrice, MovieTypes _movieTypes) external isOwner {
+        countMovie++;
+        // create movie
+        Movies[countMovie].movieId = countMovie;
+        Movies[countMovie].movieTitle = _movieTitle;
+        Movies[countMovie].moviePrice = _moviePrice;
+        Movies[countMovie].movieTypes = _movieTypes;
+    }
+
+    function bookingMovies(uint _movieId, uint _seatId) external payable isNotOwner isMovieAvailable(_movieId) ChooseSeats(_seatId) isSeatAvailable(_seatId) isSeatAvailableMovie(_movieId, _seatId)   {
+        
+        // create booking
+        Bookings[countBooking].bookId = countBooking;
+        Bookings[countBooking].movieId = _movieId;
+        Bookings[countBooking].seats.push(_seatId);
+        Bookings[countBooking].currentCustomer = msg.sender;
+
+        // update amount
+        Bookings[countBooking].amount = Bookings[countBooking].seats.length * Movies[_movieId].moviePrice;
+    }
+
+    function paymentMovies(uint _bookingId) payable external checkBalance(_bookingId) checkBook(_bookingId) checkPaid(_bookingId) {
+        Booking memory bookings = Bookings[_bookingId];
+        
+        uint totalFee = Bookings[_bookingId].amount;
+        uint refundFee = 0;
+
+        Bookings[_bookingId].isPaid = true;
+        countBooking++;
+
+        // update seat movie
+        for (uint i = 0; i < Bookings[_bookingId].seats.length; i++) {
+            Movies[Bookings[_bookingId].movieId].seatId.push(Bookings[_bookingId].seats[i]);
+        }
+
+        if (msg.value > Bookings[_bookingId].amount) {
+            refundFee = msg.value - Bookings[_bookingId].amount;
+        }
+
+        address payable customer = bookings.currentCustomer;
+        // refund fee to sender
+        customer.transfer(refundFee);
+
+        owner.transfer(totalFee);
+    }
+
+    function finishMovie(uint _movieId) external isOwner isMovieAvailable(_movieId) returns(bool success) {
+        delete Movies[_movieId].seatId;
+
+        return true;
+    }
+
+   function getBooking(uint _bookId) public view returns (uint _id, uint _amount, uint[] memory _seat,
+        uint _movieId, bool _isPaid) {
+        uint lengths = Bookings[_bookId].seats.length;
+        
+        uint id = Bookings[_bookId].bookId;
+        uint amount = Bookings[_bookId].amount;
+        bool isPaid = Bookings[_bookId].isPaid;
+        uint movieId = Bookings[_bookId].movieId;
+
+        uint[] memory seat = new uint[](lengths);
+
+        Booking storage books = Bookings[_bookId];
+        for (uint i = 0; i < lengths; i++) {
+            seat[i] = books.seats[i];
+        }
+
+        return (id, amount, seat, movieId, isPaid);
+    }
+
+    function getMovies(uint _movieId) public view returns (uint _id, string memory _movieTitle, uint _moviePrice, 
+        uint[] memory _seat, MovieTypes _movieTypes) {
+        uint lengths = Movies[_movieId].seatId.length;
+        
+        uint id = Movies[_movieId].movieId;
+        string memory movieTitle = Movies[_movieId].movieTitle;
+        uint moviePrice = Movies[_movieId].moviePrice;
+        MovieTypes movieTypes = Movies[_movieId].movieTypes;
+
+        uint[] memory seat = new uint[](lengths);
+
+        Movie storage moviess = Movies[_movieId];
+        for (uint i = 0; i < lengths; i++) {
+            seat[i] = moviess.seatId[i];
+        }
+
+        return (id, movieTitle, moviePrice, seat, movieTypes);
     }
 }
